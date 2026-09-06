@@ -25,13 +25,11 @@ abstract class BaseAIService
      */
     protected function withFallback(callable $call): mixed
     {
-        $attempts = 0;
         $lastException = null;
-
-        // Try primary first, then fallback
         $providers = [$this->primaryProvider, $this->fallbackProvider];
 
         foreach ($providers as $provider) {
+            $attempts = 0;
             while ($attempts < $this->maxRetries) {
                 try {
                     return $call($this->resolveProvider($provider), $provider);
@@ -47,17 +45,14 @@ abstract class BaseAIService
                     ]);
 
                     if ($attempts < $this->maxRetries) {
-                        sleep(1); // brief pause before retry
+                        sleep(1);
                     }
                 }
             }
-
-            // Reset attempt counter for next provider
-            $attempts = 0;
         }
 
         throw new Exception(
-            'All AI providers failed after retries. Last error: ' . $lastException?->getMessage(),
+            'All AI providers failed. Last error: ' . $lastException?->getMessage(),
             0,
             $lastException
         );
@@ -68,15 +63,14 @@ abstract class BaseAIService
      */
     protected function resolveProvider(string $provider): Provider
     {
-        return match($provider) {
-            'openai' => Provider::OpenAI,
+        return match ($provider) {
             'gemini' => Provider::Gemini,
             default  => Provider::OpenAI,
         };
     }
 
     /**
-     * Get the appropriate model for a given task and provider.
+     * Get the model name for a given task and provider.
      */
     protected function getModel(string $task, string $provider): string
     {
@@ -87,7 +81,7 @@ abstract class BaseAIService
     }
 
     /**
-     * Validate that the AI response contains required fields.
+     * Validate that an array contains required keys.
      */
     protected function validateStructuredResponse(array $response, array $requiredKeys): void
     {
@@ -96,5 +90,41 @@ abstract class BaseAIService
                 throw new Exception("AI response missing required field: {$key}");
             }
         }
+    }
+
+    /**
+     * Generate text via Prism (plain text response).
+     */
+    protected function generateText(Provider $provider, string $model, string $systemPrompt, string $prompt, int $maxTokens = 1024): string
+    {
+        $response = Prism::text()
+            ->using($provider, $model)
+            ->withSystemPrompt($systemPrompt)
+            ->withPrompt($prompt)
+            ->withMaxTokens($maxTokens)
+            ->asText();
+
+        return $response->text;
+    }
+
+    /**
+     * Generate and parse a JSON response via Prism text (ask AI to return JSON, parse manually).
+     * Used when structured schema is complex or nested.
+     */
+    protected function generateJson(Provider $provider, string $model, string $systemPrompt, string $prompt, int $maxTokens = 2048): array
+    {
+        $text = $this->generateText($provider, $model, $systemPrompt, $prompt, $maxTokens);
+
+        // Strip markdown code fences if present
+        $clean = preg_replace('/^```(?:json)?\s*/i', '', trim($text));
+        $clean = preg_replace('/\s*```$/', '', $clean);
+
+        $data = json_decode($clean, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new Exception('AI returned invalid JSON: ' . json_last_error_msg() . ' | Raw: ' . substr($text, 0, 200));
+        }
+
+        return $data;
     }
 }

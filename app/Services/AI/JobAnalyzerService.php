@@ -2,24 +2,12 @@
 
 namespace App\Services\AI;
 
-use Exception;
-
 class JobAnalyzerService extends BaseAIService
 {
     /**
-     * Analyze a job description and extract structured data.
+     * Analyze a job description and return structured data.
      *
-     * @param string      $jobDescription
-     * @param string|null $position
-     * @param string|null $experienceLevel
-     *
-     * @return array{
-     *   position: string,
-     *   seniority: string,
-     *   responsibilities: array,
-     *   skills: array,
-     *   categories: array
-     * }
+     * @return array{position:string, seniority:string, responsibilities:array, skills:array, categories:array}
      */
     public function analyze(
         string $jobDescription,
@@ -30,19 +18,7 @@ class JobAnalyzerService extends BaseAIService
             $model  = $this->getModel('job_analyzer', $providerName);
             $prompt = $this->buildPrompt($jobDescription, $position, $experienceLevel);
 
-            $result = Prism::text()
-                ->using($provider, $model)
-                ->withSystemPrompt($this->systemPrompt())
-                ->withPrompt($prompt)
-                ->withMaxTokens(1024)
-                ->asJson()
-                ->generate();
-
-            $data = json_decode($result->text, true);
-
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                throw new Exception('Job analyzer returned invalid JSON.');
-            }
+            $data = $this->generateJson($provider, $model, $this->systemPrompt(), $prompt, 1024);
 
             $this->validateStructuredResponse($data, ['position', 'seniority', 'skills', 'categories']);
 
@@ -52,33 +28,24 @@ class JobAnalyzerService extends BaseAIService
 
     private function systemPrompt(): string
     {
-        return <<<PROMPT
-You are an expert HR analyst. Extract structured information from job descriptions.
-Always respond with valid JSON only. Do not include any explanation outside the JSON.
-PROMPT;
+        return 'You are an expert HR analyst. Extract structured information from job descriptions. Respond with valid JSON only — no markdown, no explanation.';
     }
 
     private function buildPrompt(string $jd, ?string $position, ?string $level): string
     {
         $hints = '';
-        if ($position) {
-            $hints .= "The user believes this is a {$position} role. ";
-        }
-        if ($level) {
-            $hints .= "Expected experience level: {$level}. ";
-        }
+        if ($position) $hints .= "The user believes this is a {$position} role. ";
+        if ($level)    $hints .= "Expected experience level: {$level}. ";
 
         return <<<PROMPT
 {$hints}
 
-Analyze the following job description and return a JSON object with exactly this structure:
+Analyze the job description below and return this exact JSON structure:
 {
   "position": "string",
   "seniority": "junior|mid|senior|lead",
   "responsibilities": ["string"],
-  "skills": [
-    {"name": "string", "importance": "required|preferred"}
-  ],
+  "skills": [{"name": "string", "importance": "required|preferred"}],
   "categories": ["technical|behavioral|project_experience|leadership|communication"]
 }
 

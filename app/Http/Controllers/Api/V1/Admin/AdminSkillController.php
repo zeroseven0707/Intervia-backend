@@ -3,47 +3,53 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Skill;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class AdminSkillController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function index(): JsonResponse
     {
-        //
+        return response()->json(['data' => Skill::orderBy('category')->orderBy('name')->get()]);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
-        //
+        $data = $request->validate([
+            'name'        => 'required|string|max:100|unique:skills,name',
+            'category'    => 'nullable|string|max:50',
+            'description' => 'nullable|string',
+            'is_active'   => 'boolean',
+        ]);
+        $data['slug'] = Str::slug($data['name']);
+
+        return response()->json(['data' => Skill::create($data)], 201);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
+    public function show(Skill $skill): JsonResponse
     {
-        //
+        return response()->json(['data' => $skill]);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
+    public function update(Request $request, Skill $skill): JsonResponse
     {
-        //
+        $data = $request->validate([
+            'name'        => 'sometimes|string|max:100|unique:skills,name,' . $skill->id,
+            'category'    => 'nullable|string|max:50',
+            'description' => 'nullable|string',
+            'is_active'   => 'boolean',
+        ]);
+        if (isset($data['name'])) $data['slug'] = Str::slug($data['name']);
+        $skill->update($data);
+
+        return response()->json(['data' => $skill]);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
+    public function destroy(Skill $skill): JsonResponse
     {
-        //
+        $skill->delete();
+        return response()->json(['message' => 'Deleted.']);
     }
 }
