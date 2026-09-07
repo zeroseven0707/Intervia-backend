@@ -12,7 +12,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->statefulApi();
+        // API routes use token-based auth (Sanctum) — no CSRF needed
+        // Do NOT call statefulApi() here as it adds VerifyCsrfToken to API routes
 
         $middleware->alias([
             'role' => \App\Http\Middleware\CheckRole::class,

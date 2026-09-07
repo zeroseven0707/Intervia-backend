@@ -13,7 +13,6 @@ use App\Services\AI\AnswerEvaluatorService;
 use App\Services\AI\QuestionGeneratorService;
 use App\Services\AI\SkillGapService;
 use Exception;
-use Illuminate\Support\Facades\DB;
 
 class InterviewService
 {

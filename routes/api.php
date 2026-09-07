@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\JobAnalyzerController;
 use App\Http\Controllers\Api\V1\LearningController;
 use App\Http\Controllers\Api\V1\PositionController;
 use App\Http\Controllers\Api\V1\DashboardController;
+use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\Admin\AdminPositionController;
 use App\Http\Controllers\Api\V1\Admin\AdminSkillController;
 use App\Http\Controllers\Api\V1\Admin\AdminSourceController;
@@ -37,6 +38,11 @@ Route::prefix('v1')->group(function () {
 
         // Dashboard
         Route::get('dashboard', [DashboardController::class, 'index']);
+
+        // Profile
+        Route::get('profile',           [ProfileController::class, 'show']);
+        Route::put('profile',           [ProfileController::class, 'update']);
+        Route::put('profile/password',  [ProfileController::class, 'updatePassword']);
 
         // Job Analyzer
         Route::post('analyze-job', [JobAnalyzerController::class, 'analyze']);

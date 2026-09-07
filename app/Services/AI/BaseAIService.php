@@ -11,22 +11,24 @@ abstract class BaseAIService
 {
     protected string $primaryProvider;
     protected string $fallbackProvider;
-    protected int $maxRetries;
+    protected int    $maxRetries;
+    private Prism    $prism;
 
     public function __construct()
     {
         $this->primaryProvider  = config('ai.primary_provider', 'openai');
         $this->fallbackProvider = config('ai.fallback_provider', 'gemini');
         $this->maxRetries       = config('ai.max_retries', 3);
+        $this->prism            = app(Prism::class);
     }
 
     /**
-     * Run an AI call with automatic fallback to the secondary provider.
+     * Run an AI call with automatic provider fallback.
      */
     protected function withFallback(callable $call): mixed
     {
         $lastException = null;
-        $providers = [$this->primaryProvider, $this->fallbackProvider];
+        $providers     = [$this->primaryProvider, $this->fallbackProvider];
 
         foreach ($providers as $provider) {
             $attempts = 0;
@@ -58,9 +60,6 @@ abstract class BaseAIService
         );
     }
 
-    /**
-     * Resolve provider string to Prism Provider enum.
-     */
     protected function resolveProvider(string $provider): Provider
     {
         return match ($provider) {
@@ -69,20 +68,13 @@ abstract class BaseAIService
         };
     }
 
-    /**
-     * Get the model name for a given task and provider.
-     */
     protected function getModel(string $task, string $provider): string
     {
         $taskType = config("ai.task_models.{$task}", 'default');
         $modelKey = $taskType === 'evaluation' ? 'evaluation_model' : 'default_model';
-
         return config("ai.providers.{$provider}.{$modelKey}");
     }
 
-    /**
-     * Validate that an array contains required keys.
-     */
     protected function validateStructuredResponse(array $response, array $requiredKeys): void
     {
         foreach ($requiredKeys as $key) {
@@ -93,11 +85,17 @@ abstract class BaseAIService
     }
 
     /**
-     * Generate text via Prism (plain text response).
+     * Generate plain text via Prism.
      */
-    protected function generateText(Provider $provider, string $model, string $systemPrompt, string $prompt, int $maxTokens = 1024): string
-    {
-        $response = Prism::text()
+    protected function generateText(
+        Provider $provider,
+        string   $model,
+        string   $systemPrompt,
+        string   $prompt,
+        int      $maxTokens = 1024
+    ): string {
+        $response = $this->prism
+            ->text()
             ->using($provider, $model)
             ->withSystemPrompt($systemPrompt)
             ->withPrompt($prompt)
@@ -108,21 +106,27 @@ abstract class BaseAIService
     }
 
     /**
-     * Generate and parse a JSON response via Prism text (ask AI to return JSON, parse manually).
-     * Used when structured schema is complex or nested.
+     * Generate text and parse as JSON.
+     * Strips markdown fences if the model wraps output in ```json blocks.
      */
-    protected function generateJson(Provider $provider, string $model, string $systemPrompt, string $prompt, int $maxTokens = 2048): array
-    {
-        $text = $this->generateText($provider, $model, $systemPrompt, $prompt, $maxTokens);
-
-        // Strip markdown code fences if present
+    protected function generateJson(
+        Provider $provider,
+        string   $model,
+        string   $systemPrompt,
+        string   $prompt,
+        int      $maxTokens = 2048
+    ): array {
+        $text  = $this->generateText($provider, $model, $systemPrompt, $prompt, $maxTokens);
         $clean = preg_replace('/^```(?:json)?\s*/i', '', trim($text));
-        $clean = preg_replace('/\s*```$/', '', $clean);
+        $clean = preg_replace('/\s*```$/s', '', $clean);
 
         $data = json_decode($clean, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new Exception('AI returned invalid JSON: ' . json_last_error_msg() . ' | Raw: ' . substr($text, 0, 200));
+            throw new Exception(
+                'AI returned invalid JSON: ' . json_last_error_msg() .
+                ' | Raw (first 300): ' . substr($text, 0, 300)
+            );
         }
 
         return $data;
