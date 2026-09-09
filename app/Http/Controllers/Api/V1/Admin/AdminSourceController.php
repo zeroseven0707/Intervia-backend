@@ -40,13 +40,19 @@ class AdminSourceController extends Controller
     public function update(Request $request, LearningSource $source): JsonResponse
     {
         $data = $request->validate([
-            'title'   => 'sometimes|string|max:255',
-            'status'  => 'sometimes|in:pending,approved,rejected,archived',
-            'author'  => 'nullable|string|max:100',
+            'type'        => 'sometimes|in:youtube,article,documentation,pdf',
+            'title'       => 'sometimes|string|max:255',
+            'url'         => 'sometimes|url|max:500',
+            'publisher'   => 'nullable|string|max:100',
+            'author'      => 'nullable|string|max:100',
+            'language'    => 'nullable|string|max:10',
+            'external_id' => 'nullable|string|max:100',
+            'status'      => 'sometimes|in:pending,approved,rejected,archived',
+            'metadata'    => 'sometimes|array',
         ]);
         $source->update($data);
 
-        return response()->json(['data' => $source]);
+        return response()->json(['data' => $source->fresh()]);
     }
 
     public function destroy(LearningSource $source): JsonResponse

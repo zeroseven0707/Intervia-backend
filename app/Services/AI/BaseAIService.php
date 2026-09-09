@@ -2,6 +2,7 @@
 
 namespace App\Services\AI;
 
+use App\Models\AiPromptTemplate;
 use Exception;
 use Illuminate\Support\Facades\Log;
 use Prism\Prism\Prism;
@@ -20,6 +21,35 @@ abstract class BaseAIService
         $this->fallbackProvider = config('ai.fallback_provider', 'gemini');
         $this->maxRetries       = config('ai.max_retries', 3);
         $this->prism            = app(Prism::class);
+    }
+
+    protected function resolveSystemPrompt(string $type, string $fallback): string
+    {
+        static $cache = [];
+
+        if (isset($cache[$type])) {
+            return $cache[$type];
+        }
+
+        try {
+            $active = AiPromptTemplate::where('type', $type)
+                ->where('is_active', true)
+                ->orderByDesc('id')
+                ->first();
+
+            if ($active && !empty($active->system_prompt)) {
+                $cache[$type] = $active->system_prompt;
+                return $cache[$type];
+            }
+        } catch (Exception $e) {
+            Log::warning('Failed to load AI prompt template from DB', [
+                'type'  => $type,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        $cache[$type] = $fallback;
+        return $cache[$type];
     }
 
     /**

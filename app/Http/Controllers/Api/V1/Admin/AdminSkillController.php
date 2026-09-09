@@ -12,7 +12,7 @@ class AdminSkillController extends Controller
 {
     public function index(): JsonResponse
     {
-        return response()->json(['data' => Skill::orderBy('category')->orderBy('name')->get()]);
+        return response()->json(['data' => Skill::withCount('positions')->orderBy('category')->orderBy('name')->get()]);
     }
 
     public function store(Request $request): JsonResponse

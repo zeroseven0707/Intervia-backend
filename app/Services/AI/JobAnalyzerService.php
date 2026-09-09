@@ -18,17 +18,15 @@ class JobAnalyzerService extends BaseAIService
             $model  = $this->getModel('job_analyzer', $providerName);
             $prompt = $this->buildPrompt($jobDescription, $position, $experienceLevel);
 
-            $data = $this->generateJson($provider, $model, $this->systemPrompt(), $prompt, 1024);
+            $default = 'You are an expert HR analyst. Extract structured information from job descriptions. Respond with valid JSON only — no markdown, no explanation.';
+            $systemPrompt = $this->resolveSystemPrompt('job_analyzer', $default);
+
+            $data = $this->generateJson($provider, $model, $systemPrompt, $prompt, 1024);
 
             $this->validateStructuredResponse($data, ['position', 'seniority', 'skills', 'categories']);
 
             return $data;
         });
-    }
-
-    private function systemPrompt(): string
-    {
-        return 'You are an expert HR analyst. Extract structured information from job descriptions. Respond with valid JSON only — no markdown, no explanation.';
     }
 
     private function buildPrompt(string $jd, ?string $position, ?string $level): string

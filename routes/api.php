@@ -13,6 +13,8 @@ use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\Admin\AdminPositionController;
 use App\Http\Controllers\Api\V1\Admin\AdminSkillController;
 use App\Http\Controllers\Api\V1\Admin\AdminSourceController;
+use App\Http\Controllers\Api\V1\Admin\AdminUserController;
+use App\Http\Controllers\Api\V1\Admin\AdminAiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -66,7 +68,27 @@ Route::prefix('v1')->group(function () {
     // ── Admin ──────────────────────────────────────────────────────────────
     Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(function () {
         Route::apiResource('positions', AdminPositionController::class);
+        Route::post('positions/{position}/skills',        [AdminPositionController::class, 'attachSkill']);
+        Route::delete('positions/{position}/skills/{skill}', [AdminPositionController::class, 'detachSkill']);
+        Route::put('positions/{position}/skills',         [AdminPositionController::class, 'syncSkills']);
+
         Route::apiResource('skills',    AdminSkillController::class);
         Route::apiResource('sources',   AdminSourceController::class);
+
+        // User management
+        Route::get('stats',               [AdminUserController::class, 'stats']);
+        Route::get('users',               [AdminUserController::class, 'index']);
+        Route::get('users/{user}',        [AdminUserController::class, 'show']);
+        Route::put('users/{user}',        [AdminUserController::class, 'update']);
+        Route::delete('users/{user}',     [AdminUserController::class, 'destroy']);
+
+        // AI management
+        Route::get('ai/config',                    [AdminAiController::class, 'getConfig']);
+        Route::put('ai/config',                    [AdminAiController::class, 'updateConfig']);
+        Route::get('ai/prompts',                   [AdminAiController::class, 'listPrompts']);
+        Route::post('ai/prompts',                  [AdminAiController::class, 'storePrompt']);
+        Route::get('ai/prompts/{prompt}',          [AdminAiController::class, 'showPrompt']);
+        Route::put('ai/prompts/{prompt}',          [AdminAiController::class, 'updatePrompt']);
+        Route::delete('ai/prompts/{prompt}',       [AdminAiController::class, 'destroyPrompt']);
     });
 });

@@ -7,6 +7,8 @@ use App\Models\Position;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use App\Models\Skill;
+
 
 class AdminPositionController extends Controller
 {
@@ -49,5 +51,51 @@ class AdminPositionController extends Controller
     {
         $position->delete();
         return response()->json(['message' => 'Deleted.']);
+    }
+
+    public function attachSkill(Request $request, Position $position): JsonResponse
+    {
+        $data = $request->validate([
+            'skill_id'   => 'required|exists:skills,id',
+            'importance' => 'required|in:required,preferred',
+        ]);
+
+        $position->skills()->attach($data['skill_id'], ['importance' => $data['importance']]);
+
+        return response()->json([
+            'data'    => $position->load('skills'),
+            'message' => 'Skill attached.',
+        ]);
+    }
+
+    public function detachSkill(Position $position, Skill $skill): JsonResponse
+    {
+        $position->skills()->detach($skill->id);
+
+        return response()->json([
+            'data'    => $position->load('skills'),
+            'message' => 'Skill detached.',
+        ]);
+    }
+
+    public function syncSkills(Request $request, Position $position): JsonResponse
+    {
+        $data = $request->validate([
+            'skills'            => 'required|array',
+            'skills.*.skill_id' => 'required|exists:skills,id',
+            'skills.*.importance' => 'required|in:required,preferred',
+        ]);
+
+        $syncData = [];
+        foreach ($data['skills'] as $item) {
+            $syncData[$item['skill_id']] = ['importance' => $item['importance']];
+        }
+
+        $position->skills()->sync($syncData);
+
+        return response()->json([
+            'data'    => $position->load('skills'),
+            'message' => 'Skills synced.',
+        ]);
     }
 }

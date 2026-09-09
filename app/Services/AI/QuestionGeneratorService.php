@@ -14,8 +14,10 @@ class QuestionGeneratorService extends BaseAIService
         return $this->withFallback(function ($provider, $providerName) use ($context) {
             $model  = $this->getModel('interviewer', $providerName);
             $prompt = $this->buildPrompt($context);
+            $default = 'You are a professional technical interviewer. Generate one focused interview question. Respond with valid JSON only — no markdown, no explanation. Never repeat questions already asked.';
+            $systemPrompt = $this->resolveSystemPrompt('question_generator', $default);
 
-            $data = $this->generateJson($provider, $model, $this->systemPrompt(), $prompt, 512);
+            $data = $this->generateJson($provider, $model, $systemPrompt, $prompt, 512);
 
             $this->validateStructuredResponse($data, ['question', 'category', 'skill', 'difficulty', 'is_follow_up']);
 
@@ -24,11 +26,6 @@ class QuestionGeneratorService extends BaseAIService
 
             return $data;
         });
-    }
-
-    private function systemPrompt(): string
-    {
-        return 'You are a professional technical interviewer. Generate one focused interview question. Respond with valid JSON only — no markdown, no explanation. Never repeat questions already asked.';
     }
 
     private function buildPrompt(array $ctx): string

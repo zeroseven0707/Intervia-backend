@@ -20,18 +20,19 @@ class DatabaseSeeder extends Seeder
         User::firstOrCreate(
             ['email' => 'admin@intervia.app'],
             [
-                'name'     => 'Admin',
-                'password' => bcrypt('password'),
-                'role'     => UserRole::Admin,
+                'name'             => 'Admin Intervia',
+                'password'         => bcrypt('admin123'),
+                'role'             => UserRole::Admin,
+                'experience_level' => 'senior',
             ]
         );
 
         // Demo user
         User::firstOrCreate(
-            ['email' => 'demo@intervia.app'],
+            ['email' => 'user@intervia.app'],
             [
-                'name'             => 'Demo User',
-                'password'         => bcrypt('password'),
+                'name'             => 'Budi Santoso',
+                'password'         => bcrypt('user123'),
                 'role'             => UserRole::User,
                 'experience_level' => 'mid',
             ]

@@ -48,8 +48,8 @@ return [
     |--------------------------------------------------------------------------
     */
 
-    'max_retries'       => 3,
-    'timeout_seconds'   => 30,
-    'max_tokens'        => 2048,
-    'rate_limit_per_min'=> 30,
+    'max_retries'       => env('AI_MAX_RETRIES', 3),
+    'timeout_seconds'   => env('AI_TIMEOUT_SECONDS', 30),
+    'max_tokens'        => env('AI_MAX_TOKENS', 2048),
+    'rate_limit_per_min'=> env('AI_RATE_LIMIT_PER_MIN', 30),
 ];

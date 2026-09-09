@@ -12,14 +12,11 @@ class CareerCoachService extends BaseAIService
         return $this->withFallback(function ($provider, $providerName) use ($context) {
             $model  = $this->getModel('coach', $providerName);
             $prompt = $this->buildPrompt($context);
+            $default = 'You are a supportive career coach. Give a brief, actionable, encouraging message. Under 150 words. Be specific and honest — not generic.';
+            $systemPrompt = $this->resolveSystemPrompt('career_coach', $default);
 
-            return $this->generateText($provider, $model, $this->systemPrompt(), $prompt, 512);
+            return $this->generateText($provider, $model, $systemPrompt, $prompt, 512);
         });
-    }
-
-    private function systemPrompt(): string
-    {
-        return 'You are a supportive career coach. Give a brief, actionable, encouraging message. Under 150 words. Be specific and honest — not generic.';
     }
 
     private function buildPrompt(array $ctx): string

@@ -22,8 +22,10 @@ class AnswerEvaluatorService extends BaseAIService
             $model  = $this->getModel('evaluator', $providerName);
             $prompt = $this->buildPrompt($question, $answer, $position, $seniority, $skill);
             $maxTokens = (int) config('ai.max_tokens', 2048);
+            $default = 'You are a senior technical interviewer and expert evaluator. Evaluate interview answers fairly and constructively. Do NOT reward keyword stuffing — evaluate actual understanding. Respond with valid JSON only — no markdown, no explanation.';
+            $systemPrompt = $this->resolveSystemPrompt('answer_evaluator', $default);
 
-            $data = $this->generateJson($provider, $model, $this->systemPrompt(), $prompt, $maxTokens);
+            $data = $this->generateJson($provider, $model, $systemPrompt, $prompt, $maxTokens);
 
             $required = [
                 'overall_score', 'relevance_score', 'knowledge_score', 'clarity_score',
@@ -46,11 +48,6 @@ class AnswerEvaluatorService extends BaseAIService
 
             return $data;
         });
-    }
-
-    private function systemPrompt(): string
-    {
-        return 'You are a senior technical interviewer and expert evaluator. Evaluate interview answers fairly and constructively. Do NOT reward keyword stuffing — evaluate actual understanding. Respond with valid JSON only — no markdown, no explanation.';
     }
 
     private function buildPrompt(string $question, string $answer, string $position, string $seniority, string $skill): string

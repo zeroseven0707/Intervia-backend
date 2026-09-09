@@ -10,6 +10,7 @@ use App\Models\InterviewSession;
 use App\Models\UserSkillScore;
 use App\Models\UserProgress;
 use App\Services\AI\AnswerEvaluatorService;
+use App\Services\AI\CareerCoachService;
 use App\Services\AI\QuestionGeneratorService;
 use App\Services\AI\SkillGapService;
 use Exception;
@@ -20,6 +21,7 @@ class InterviewService
         private QuestionGeneratorService $questionGenerator,
         private AnswerEvaluatorService   $evaluator,
         private SkillGapService          $skillGapService,
+        private CareerCoachService       $coach,
         private InterviewStateMachine    $stateMachine,
     ) {}
 
@@ -153,7 +155,6 @@ class InterviewService
             ->with(['answer.evaluation'])
             ->get();
 
-        // Collect evaluations
         $evaluations = $questions
             ->map(fn($q) => $q->answer?->evaluation)
             ->filter();
@@ -163,16 +164,28 @@ class InterviewService
             return;
         }
 
-        // Overall score = average of all overall_scores
         $overallScore = (int) round($evaluations->avg('overall_score'));
 
-        // Category scores
         $technicalEvals = $questions->filter(fn($q) => $q->category === 'technical')
             ->map(fn($q) => $q->answer?->evaluation)->filter();
         $technicalScore = $technicalEvals->isNotEmpty()
             ? (int) round($technicalEvals->avg('overall_score')) : null;
 
-        // Aggregate skill gaps
+        $communicationScore = (int) round($evaluations->avg(function ($e) {
+            return ($e->clarity_score + $e->relevance_score) / 2;
+        }));
+
+        $behavioralEvals = $questions->filter(fn($q) => in_array($q->category, ['technical', 'project_experience']))
+            ->map(fn($q) => $q->answer?->evaluation)->filter();
+        $problemSolvingScore = $behavioralEvals->isNotEmpty()
+            ? (int) round($behavioralEvals->avg(function ($e) {
+                return ($e->reasoning_score + $e->knowledge_score) / 2;
+            })) : null;
+
+        $answerStructureScore = (int) round($evaluations->avg(function ($e) {
+            return ($e->completeness_score + $e->clarity_score) / 2;
+        }));
+
         $skillData = $questions->map(fn($q) => [
             'skill' => $q->skill ?? 'General',
             'score' => $q->answer?->evaluation?->overall_score ?? 0,
@@ -180,30 +193,52 @@ class InterviewService
 
         $skillGaps = $this->skillGapService->aggregate($skillData);
 
-        // Aggregate strengths/weaknesses from evaluations
         $allStrengths  = $evaluations->flatMap(fn($e) => $e->strengths  ?? [])->unique()->values()->toArray();
         $allWeaknesses = $evaluations->flatMap(fn($e) => $e->weaknesses ?? [])->unique()->values()->toArray();
 
-        // Save report
+        $jobAnalysis = $session->job_analysis ?? [];
+        $position = $jobAnalysis['position'] ?? $session->position?->name ?? 'General';
+
+        $summary = "Completed {$questions->count()} questions with an overall score of {$overallScore}/100.";
+        $recommendations = [];
+
+        try {
+            $coachMessage = $this->coach->coach([
+                'position'      => $position,
+                'overall_score' => $overallScore,
+                'skill_gaps'    => $skillGaps,
+                'strengths'     => array_slice($allStrengths, 0, 5),
+                'weaknesses'    => array_slice($allWeaknesses, 0, 5),
+            ]);
+
+            $lines = explode("\n", trim($coachMessage));
+            if (!empty($lines)) {
+                $summary = trim($lines[0]);
+                $recommendations = array_values(array_filter(array_map('trim', array_slice($lines, 1))));
+            }
+        } catch (Exception $e) {
+        }
+
         $report = InterviewReport::create([
-            'session_id'      => $session->id,
-            'overall_score'   => $overallScore,
-            'technical_score' => $technicalScore,
-            'summary'         => "Completed {$questions->count()} questions with an overall score of {$overallScore}/100.",
-            'strengths'       => array_slice($allStrengths, 0, 5),
-            'weaknesses'      => array_slice($allWeaknesses, 0, 5),
-            'skill_gaps'      => $skillGaps,
-            'recommendations' => [],
-            'created_at'      => now(),
+            'session_id'             => $session->id,
+            'overall_score'          => $overallScore,
+            'technical_score'        => $technicalScore,
+            'communication_score'    => $communicationScore,
+            'problem_solving_score'  => $problemSolvingScore,
+            'answer_structure_score' => $answerStructureScore,
+            'summary'                => $summary,
+            'strengths'              => array_slice($allStrengths, 0, 5),
+            'weaknesses'             => array_slice($allWeaknesses, 0, 5),
+            'skill_gaps'             => $skillGaps,
+            'recommendations'        => $recommendations,
+            'created_at'             => now(),
         ]);
 
-        // Update session overall score
         $session->update([
             'overall_score' => $overallScore,
             'completed_at'  => now(),
         ]);
 
-        // Update user skill scores
         $this->updateUserSkillScores($session, $skillGaps);
 
         $this->stateMachine->transition($session->fresh(), InterviewStatus::Completed);
