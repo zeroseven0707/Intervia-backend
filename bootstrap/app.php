@@ -16,7 +16,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // Do NOT call statefulApi() here as it adds VerifyCsrfToken to API routes
 
         $middleware->alias([
-            'role' => \App\Http\Middleware\CheckRole::class,
+            'role'         => \App\Http\Middleware\CheckRole::class,
+            'subscription' => \App\Http\Middleware\CheckSubscription::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -10,11 +10,14 @@ use App\Http\Controllers\Api\V1\LearningController;
 use App\Http\Controllers\Api\V1\PositionController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\ProfileController;
+use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\Admin\AdminPositionController;
 use App\Http\Controllers\Api\V1\Admin\AdminSkillController;
 use App\Http\Controllers\Api\V1\Admin\AdminSourceController;
 use App\Http\Controllers\Api\V1\Admin\AdminUserController;
 use App\Http\Controllers\Api\V1\Admin\AdminAiController;
+use App\Http\Controllers\Api\V1\Admin\AdminPaymentController;
+use App\Http\Controllers\Api\V1\Admin\AdminPackageController;
 
 /*
 |--------------------------------------------------------------------------
@@ -31,6 +34,16 @@ Route::prefix('v1')->group(function () {
     });
 
     Route::get('positions', [PositionController::class, 'index']);
+
+    // Public payment info
+    Route::get('payment/public-config',  [PaymentController::class, 'publicConfig']);
+    Route::get('payment/packages',       [PaymentController::class, 'packages']);
+
+    // Midtrans webhooks & redirects (no auth, Midtrans POST signature verified inside)
+    Route::post('payment/midtrans/notification', [PaymentController::class, 'midtransNotification']);
+    Route::get('payment/midtrans/finish',        [PaymentController::class, 'midtransFinish']);
+    Route::get('payment/midtrans/unfinish',      [PaymentController::class, 'midtransUnfinish']);
+    Route::get('payment/midtrans/error',         [PaymentController::class, 'midtransError']);
 
     // ── Authenticated ──────────────────────────────────────────────────────
     Route::middleware('auth:sanctum')->group(function () {
@@ -49,16 +62,30 @@ Route::prefix('v1')->group(function () {
         // Job Analyzer
         Route::post('analyze-job', [JobAnalyzerController::class, 'analyze']);
 
-        // Interview Sessions
-        Route::apiResource('sessions', InterviewSessionController::class)
-            ->only(['index', 'store', 'show', 'destroy']);
-
-        // Interview flow (nested under session)
-        Route::prefix('sessions/{session}')->group(function () {
-            Route::get('next-question',  [InterviewQuestionController::class, 'next']);
-            Route::post('answer',        [InterviewQuestionController::class, 'submitAnswer']);
-            Route::get('report',         [InterviewReportController::class, 'show']);
+        // Payment (user side)
+        Route::prefix('payment')->group(function () {
+            Route::get('subscription-status',         [PaymentController::class, 'subscriptionStatus']);
+            Route::post('checkout/package/{package}', [PaymentController::class, 'checkoutPackage']);
+            Route::post('checkout/single',            [PaymentController::class, 'checkoutSingle']);
+            Route::get('transactions',                [PaymentController::class, 'myTransactions']);
+            Route::get('transactions/{transaction}',  [PaymentController::class, 'transactionStatus']);
         });
+
+        // Interview Sessions (index, show, destroy: no subscription check; store + flow: need subscription)
+        Route::apiResource('sessions', InterviewSessionController::class)
+            ->only(['index', 'show', 'destroy']);
+
+        Route::middleware('subscription')->group(function () {
+            Route::post('sessions', [InterviewSessionController::class, 'store']);
+
+            Route::prefix('sessions/{session}')->group(function () {
+                Route::get('next-question',  [InterviewQuestionController::class, 'next']);
+                Route::post('answer',        [InterviewQuestionController::class, 'submitAnswer']);
+            });
+        });
+
+        // Session report (completed sessions, no need active sub)
+        Route::get('sessions/{session}/report', [InterviewReportController::class, 'show']);
 
         // Learning Recommendations
         Route::get('learning/recommendations',     [LearningController::class, 'recommendations']);
@@ -74,6 +101,18 @@ Route::prefix('v1')->group(function () {
 
         Route::apiResource('skills',    AdminSkillController::class);
         Route::apiResource('sources',   AdminSourceController::class);
+        Route::apiResource('packages',  AdminPackageController::class);
+
+        // Payment admin
+        Route::prefix('payment')->group(function () {
+            Route::get('settings',                         [AdminPaymentController::class, 'getSettings']);
+            Route::put('settings',                         [AdminPaymentController::class, 'updateSettings']);
+            Route::get('summary',                          [AdminPaymentController::class, 'summary']);
+            Route::get('transactions',                     [AdminPaymentController::class, 'transactions']);
+            Route::get('transactions/{transaction}',       [AdminPaymentController::class, 'showTransaction']);
+            Route::put('transactions/{transaction}/status', [AdminPaymentController::class, 'updateTransactionStatus']);
+            Route::put('users/{user}/adjust-credit',       [AdminPaymentController::class, 'adjustUserCredit']);
+        });
 
         // User management
         Route::get('stats',               [AdminUserController::class, 'stats']);

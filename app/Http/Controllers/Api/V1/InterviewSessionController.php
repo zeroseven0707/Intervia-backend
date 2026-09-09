@@ -59,6 +59,16 @@ class InterviewSessionController extends Controller
             'started_at'      => now(),
         ]);
 
+        $settings = \App\Models\PaymentSetting::getSettings();
+        if ($settings->require_payment && !$user->isAdmin()) {
+            if (!$user->hasActiveSubscription()) {
+                $completedOrCreatedCount = $user->interviewSessions()->count();
+                if ($completedOrCreatedCount > $settings->free_trial_sessions) {
+                    $user->consumeSessionCredit();
+                }
+            }
+        }
+
         // Path B — paste job description: analyze with AI
         if (!empty($data['job_description'])) {
             $this->stateMachine->transition($session, InterviewStatus::Analyzing);

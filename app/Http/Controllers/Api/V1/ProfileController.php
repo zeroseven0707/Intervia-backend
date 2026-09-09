@@ -38,9 +38,20 @@ class ProfileController extends Controller
 
         $skillCount = UserSkillScore::where('user_id', $user->id)->count();
 
+        $paymentSettings = \App\Models\PaymentSetting::getSettings();
+        $freeTrialRemaining = max(0, $paymentSettings->free_trial_sessions - $totalSessions);
+
         return response()->json([
             'data' => [
                 'user'  => new UserResource($user),
+                'subscription' => [
+                    'can_start_interview'     => $user->canStartInterview(),
+                    'has_active_subscription' => $user->hasActiveSubscription(),
+                    'subscribed_until'        => $user->subscribed_until?->toISOString(),
+                    'credit_sessions'         => (int) $user->credit_sessions,
+                    'free_trial_remaining'    => $freeTrialRemaining,
+                    'require_payment'         => (bool) $paymentSettings->require_payment,
+                ],
                 'stats' => [
                     'total_sessions'     => $totalSessions,
                     'completed_sessions' => $completedSessions,

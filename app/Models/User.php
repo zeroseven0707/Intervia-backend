@@ -20,6 +20,8 @@ class User extends Authenticatable
         'role',
         'experience_level',
         'target_position_id',
+        'subscribed_until',
+        'credit_sessions',
     ];
 
     protected $hidden = [
@@ -34,6 +36,7 @@ class User extends Authenticatable
             'password'          => 'hashed',
             'role'              => UserRole::class,
             'experience_level'  => ExperienceLevel::class,
+            'subscribed_until'  => 'datetime',
         ];
     }
 
@@ -42,6 +45,53 @@ class User extends Authenticatable
     public function isAdmin(): bool
     {
         return $this->role === UserRole::Admin;
+    }
+
+    public function hasActiveSubscription(): bool
+    {
+        return $this->subscribed_until !== null && $this->subscribed_until->isFuture();
+    }
+
+    public function hasSessionCredit(): bool
+    {
+        return $this->credit_sessions > 0;
+    }
+
+    public function canStartInterview(): bool
+    {
+        if ($this->isAdmin()) return true;
+
+        $settings = PaymentSetting::getSettings();
+        if (!$settings->require_payment) return true;
+
+        if ($this->hasActiveSubscription()) return true;
+        if ($this->hasSessionCredit()) return true;
+
+        $completedCount = $this->interviewSessions()->count();
+        if ($completedCount < $settings->free_trial_sessions) return true;
+
+        return false;
+    }
+
+    public function consumeSessionCredit(): void
+    {
+        if ($this->credit_sessions > 0) {
+            $this->decrement('credit_sessions');
+        }
+    }
+
+    public function addSessions(int $count): void
+    {
+        $this->increment('credit_sessions', $count);
+    }
+
+    public function extendSubscription(int $days): void
+    {
+        $start = $this->subscribed_until && $this->subscribed_until->isFuture()
+            ? $this->subscribed_until
+            : now();
+
+        $this->update(['subscribed_until' => $start->addDays($days)]);
     }
 
     // ── Relationships ────────────────────────────────────────────────────────
@@ -64,5 +114,10 @@ class User extends Authenticatable
     public function progress()
     {
         return $this->hasMany(UserProgress::class);
+    }
+
+    public function transactions()
+    {
+        return $this->hasMany(Transaction::class)->latest();
     }
 }
