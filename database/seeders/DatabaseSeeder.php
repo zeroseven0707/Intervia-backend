@@ -37,5 +37,8 @@ class DatabaseSeeder extends Seeder
                 'experience_level' => 'mid',
             ]
         );
+
+        // Payment demo data (settings, packages, transactions, prompt templates)
+        $this->call(DemoPaymentSeeder::class);
     }
 }
