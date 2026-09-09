@@ -9,10 +9,19 @@ use Illuminate\Http\Request;
 
 class AdminSourceController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        $perPage = (int) ($request->query('per_page', 20));
+        $results = LearningSource::orderByDesc('created_at')->paginate($perPage);
+
         return response()->json([
-            'data' => LearningSource::orderByDesc('created_at')->paginate(20),
+            'data' => $results->items(),
+            'meta' => [
+                'current_page' => $results->currentPage(),
+                'last_page'    => $results->lastPage(),
+                'per_page'     => $results->perPage(),
+                'total'        => $results->total(),
+            ],
         ]);
     }
 

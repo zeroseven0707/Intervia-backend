@@ -49,6 +49,13 @@ class LearningMaterial extends Model
         });
     }
 
+    public function scopeByDifficultyList($query, array $levels)
+    {
+        return $query->where(function ($q) use ($levels) {
+            $q->whereIn('difficulty', $levels)->orWhereNull('difficulty');
+        });
+    }
+
     public function scopeOrderByQuality($query)
     {
         // Prefer shorter content (lower time commitment first), then by newest

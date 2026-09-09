@@ -23,10 +23,22 @@ class AdminUserController extends Controller
         }
 
         if ($role = $request->query('role')) {
-            $query->where('role', $role);
+            $role = $role instanceof UserRole ? $role->value : (string) $role;
+            $query->whereRaw('BINARY `role` = ?', [$role]);
         }
 
-        return response()->json($query->paginate(20));
+        $perPage = (int) ($request->query('per_page', 20));
+        $results = $query->paginate($perPage);
+
+        return response()->json([
+            'data' => $results->items(),
+            'meta' => [
+                'current_page' => $results->currentPage(),
+                'last_page'    => $results->lastPage(),
+                'per_page'     => $results->perPage(),
+                'total'        => $results->total(),
+            ],
+        ]);
     }
 
     public function show(User $user): JsonResponse
